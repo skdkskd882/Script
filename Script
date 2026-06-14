@@ -1,17 +1,110 @@
-local DataStoreService = game:GetService("DataStoreService")
-local AdminDataStore = DataStoreService:GetDataStore("SuperAdminSystem_V4")
-local PlayerService = game:GetService("Players") -- '로컬 플레이어' 수정
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
 
-local ShootEvent = Instance.new("RemoteEvent")
-ShootEvent.Name = "ShootEvent"
-ShootEvent.Parent = ReplicatedStorage
+local Config = {
+    Aimbot = true,
+    TargetRange = 1000000,
+    WalkSpeed = 500,
+    FlySpeed = 100000,
+    Flight = true,
+    ESP = true,
+    SpeedHack = true
+}
 
-local PlayerSettings = {} -- '로컬 플레이어 설정' 수정
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = Config.TargetRange
 
--- '로컬 함수'를 'local function'으로 수정
-local function createDefaultSettings()
-    return { -- '반품'을 'return'으로 수정
-        -- 이 아래에 필요한 기본 설정값들을 추가하세요
-    }
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            local distance = (hrp.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestPlayer = player
+            end
+        end
+    end
+    return closestPlayer
 end
+
+local function applyESP(player)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        if not player.Character:FindFirstChild("Highlight") then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "Highlight"
+            highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            highlight.FillTransparency = 0.5
+            highlight.Parent = player.Character
+        end
+    end
+end
+
+local function removeESP(player)
+    if player.Character and player.Character:FindFirstChild("Highlight") then
+        player.Character.Highlight:Destroy()
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if Config.Aimbot then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+        end
+    end
+
+    if Config.ESP then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                applyESP(player)
+            end
+        end
+    else
+        for _, player in ipairs(Players:GetPlayers()) do
+            removeESP(player)
+        end
+    end
+
+    if Config.SpeedHack and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local clampedSpeed = math.clamp(Config.WalkSpeed, 1, 1000)
+        LocalPlayer.Character.Humanoid.WalkSpeed = clampedSpeed
+    end
+
+    if Config.Flight and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        local moveDirection = Vector3.new(0, 0, 0)
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - Camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + Camera.CFrame.RightVector
+        end
+        
+        if moveDirection.Magnitude > 0 then
+            hrp.Velocity = moveDirection.Unit * Config.FlySpeed
+        else
+            hrp.Velocity = Vector3.new(0, 0, 0)
+        end
+    end
+end)
+
+Players.PlayerAdding:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        if Config.ESP then
+            task.wait(0.5)
+            applyESP(player)
+        end
+    end)
+end)
