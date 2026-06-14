@@ -1,0 +1,113 @@
+local DataStoreService = game:GetService("DataStoreService")
+local AdminDataStore = DataStoreService:GetDataStore("SuperAdminSystem_V4")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local ShootEvent = Instance.new("RemoteEvent")
+ShootEvent.Name = "ShootEvent"
+ShootEvent.Parent = ReplicatedStorage
+
+local playerSettings = {}
+
+local function createDefaultSettings()
+	return {
+		Skin = "Default", Avatar = "Default",
+		Fly = false, FlySpeed = 500,
+		NoClip = false, WallHack = false,
+		RageBot = true, RageSpeed = 0.001, 
+		TargetDist = 1000000,
+		KillAura = false, VoidTeleport = false,
+		ESP = false, WalkSpeed = 16,
+		AutoReload = true, BulletSpeed = 5000
+	}
+end
+
+local function getClosestEnemyHead(attacker)
+	local closestHead = nil
+	local shortestDistance = 1000000
+	local attackerRoot = attacker.Character and attacker.Character:FindFirstChild("HumanoidRootPart")
+	if not attackerRoot then return nil end
+
+	for _, player in pairs(Players:GetPlayers()) do
+		if player ~= attacker and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
+			if player.Character.Humanoid.Health > 0 then
+				local enemyRoot = player.Character:FindFirstChild("HumanoidRootPart")
+				if enemyRoot then
+					local distance = (enemyRoot.Position - attackerRoot.Position).Magnitude
+					if distance < shortestDistance then
+						shortestDistance = distance
+						closestHead = player.Character.Head
+					end
+				end
+			end
+		end
+	end
+	return closestHead
+end
+
+local function giveTriggerWeapon(player)
+	local tool = Instance.new("Tool")
+	tool.Name = "SilentWeapon"
+	tool.RequiresHandle = false
+	
+	local localScript = Instance.new("LocalScript")
+	localScript.Name = "TriggerScript"
+	localScript.Source = [[
+		local tool = script.Parent
+		local ReplicatedStorage = game:GetService("ReplicatedStorage")
+		local shootEvent = ReplicatedStorage:WaitForChild("ShootEvent")
+		
+		tool.Activated:Connect(function()
+			shootEvent:FireServer()
+		end)
+	]]
+	localScript.Parent = tool
+	tool.Parent = player:WaitForChild("Backpack")
+end
+
+Players.PlayerAdded:Connect(function(player)
+	local userId = tostring(player.UserId)
+	local savedData
+	pcall(function() savedData = AdminDataStore:GetAsync(userId) end)
+	playerSettings[player] = savedData or createDefaultSettings()
+	
+	player.CharacterAdded:Connect(function(character)
+		local humanoid = character:WaitForChild("Humanoid")
+		humanoid.WalkSpeed = playerSettings[player].WalkSpeed
+		task.wait(1)
+		giveTriggerWeapon(player)
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	if playerSettings[player] then
+		pcall(function() AdminDataStore:SetAsync(tostring(player.UserId), playerSettings[player]) end)
+		playerSettings[player] = nil
+	end
+end)
+
+ShootEvent.OnServerEvent:Connect(function(player)
+	local settings = playerSettings[player]
+	if not settings or not settings.RageBot then return end
+	
+	local character = player.Character
+	if not character or not character:FindFirstChild("Head") then return end
+	
+	local targetHead = getClosestEnemyHead(player)
+	if targetHead then
+		local origin = character.Head.Position
+		local direction = (targetHead.Position - origin).Unit * settings.TargetDist
+		
+		local raycastParams = RaycastParams.new()
+		raycastParams.FilterDescendantsInstances = {character}
+		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+		
+		local raycastResult = workspace:Raycast(origin, direction, raycastParams)
+		if raycastResult and raycastResult.Instance then
+			local hitModel = raycastResult.Instance:FindFirstAncestorOfClass("Model")
+			if hitModel and hitModel:FindFirstChildOfClass("Humanoid") then
+				hitModel:FindFirstChildOfClass("Humanoid"):TakeDamage(100)
+			end
+		end
+	end
+end)
