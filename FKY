@@ -8,7 +8,7 @@ local Config = {
     Aimbot = true,
     TargetRange = 1000000,
     WalkSpeed = 500,
-    FlySpeed = 100000,
+    FlySpeed = 300,
     Flight = true,
     ESP = true,
     SpeedHack = true
@@ -17,6 +17,10 @@ local Config = {
 local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = Config.TargetRange
+    
+    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -70,32 +74,35 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    if Config.SpeedHack and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        local clampedSpeed = math.clamp(Config.WalkSpeed, 1, 1000)
-        LocalPlayer.Character.Humanoid.WalkSpeed = clampedSpeed
-    end
+    local char = LocalPlayer.Character
+    if char then
+        if Config.SpeedHack and char:FindFirstChild("Humanoid") then
+            local clampedSpeed = math.clamp(Config.WalkSpeed, 10, 1000)
+            char.Humanoid.WalkSpeed = clampedSpeed
+        end
 
-    if Config.Flight and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = LocalPlayer.Character.HumanoidRootPart
-        local moveDirection = Vector3.new(0, 0, 0)
-        
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDirection = moveDirection + Camera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDirection = moveDirection - Camera.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDirection = moveDirection - Camera.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDirection = moveDirection + Camera.CFrame.RightVector
-        end
-        
-        if moveDirection.Magnitude > 0 then
-            hrp.Velocity = moveDirection.Unit * Config.FlySpeed
-        else
-            hrp.Velocity = Vector3.new(0, 0, 0)
+        if Config.Flight and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            local moveDirection = Vector3.new(0, 0, 0)
+            
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                moveDirection = moveDirection + Camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                moveDirection = moveDirection - Camera.CFrame.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                moveDirection = moveDirection - Camera.CFrame.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                moveDirection = moveDirection + Camera.CFrame.RightVector
+            end
+            
+            if moveDirection.Magnitude > 0 then
+                hrp.Velocity = moveDirection.Unit * Config.FlySpeed
+            else
+                hrp.Velocity = Vector3.new(0, 0, 0)
+            end
         end
     end
 end)
